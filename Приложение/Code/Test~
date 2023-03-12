@@ -1,0 +1,9 @@
+from gen import Gen
+
+class TestList(Gen):
+    """Класс работы с темами"""
+    def __init__(self, parent=None):
+        super().__init__("test_widget", parent)
+        self.initTests()
+
+        

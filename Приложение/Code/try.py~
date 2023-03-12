@@ -1,0 +1,12 @@
+from player import *
+from music import *
+
+import sys
+
+createMusFile(generateMelLevel3(), "3")
+
+app = QApplication(sys.argv)
+window = Player()
+window.setSong("../temp/3.wav")
+window.show()
+sys.exit(app.exec_())

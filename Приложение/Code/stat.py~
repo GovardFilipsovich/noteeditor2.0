@@ -1,0 +1,8 @@
+from gen import Gen
+
+
+class Stat(Gen):
+    """Класс меню. Организован для работы с меню"""
+
+    def __init__(self, parent=None):
+        super().__init__("stat_widget", parent)

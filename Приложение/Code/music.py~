@@ -1,0 +1,192 @@
+from PyQt5.QtGui import QPixmap
+from random import randrange, choice
+from mido import Message, MidiFile, MidiTrack, second2tick
+
+class Note:
+    """Класс ноты"""
+    def __init__(self, dur, orient, ton, octave, off=True):
+        #dur - длительность ноты - 1/2, 1/4, 1/8 и тд
+        self.orient = orient
+        self.off = off
+        self.setDur(dur)
+        self.ton = ton
+        self.octave = octave
+        
+
+
+    def setDur(self, dur):
+        self.dur = dur
+        if self.off:
+            self.initPict()
+
+    def getNoteNum(self):
+        """Получает номер необходимой ноты в миди"""
+        start = 60
+        list = [2, 2, 1, 2, 2, 2, 1]
+        rev = [-i for i in list[::-1]]
+
+        tons = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+        moves = self.octave * 7 + tons.index(self.ton)
+        if moves == 0:
+            return start
+        
+        cur = list if moves > 0 else rev
+        moves = moves if moves > 0 else -moves
+        for i in range(moves):
+        
+            start += cur[i%7]
+        return start
+
+    def getDur(self):
+        """Возращает дробь, которая показывает длительность ноты"""
+        d = {"whole": 1, "half": 1/2, "quarter": 1/4, "quaver":1/8}
+        return d[self.dur]
+        
+    def initPict(self):
+        self.picture = QPixmap(f"../img/{self.dur}{self.orient}.png")
+
+    def initTon(self):
+        """Определяет тон ноты"""
+
+    def __str__(self):
+        return self.dur + " " + self.ton + str(self.octave)
+
+    def __repr__(self):
+        return self.__str__()
+        
+
+
+class Pause(Note):
+    """Класс паузы"""
+    def __init__(self):
+        self.dur = 1
+    
+    def getNoteNum(self):
+        return 0
+
+    def getDur(self):
+        return self.dur
+
+    def __str__(self):
+        return "Pause" + str(self.dur)
+
+    def __repr__(self):
+        return self.__str__()
+          
+        
+#Фукция generateMelody() возращает случайную мелодию
+def generateMelLevel5():
+    tons = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    d = ["whole", "half", "quarter", "quaver"]
+    di = dict()
+    for i in range(7):
+        temp = []
+        oct = randrange(-2, 2)
+        for j in range(5):
+            n = randrange(1, 3)
+            if n != 2:
+                temp.append(Note(d[randrange(0, 4)], 1, tons[i], oct, False))
+            else:
+                temp.append(Pause())
+        di[tons[i] + str(oct)] = temp
+    return di
+
+
+def generateMelLevel1():
+    tons = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    temp = []
+    ton = randrange(0, 7)
+    pause = Pause()
+    for j in range(randrange(3, 6)):
+        if j % 2 == 0:
+            temp.append(Note("whole", 1, tons[ton], 0, False))
+        else:
+            temp.append(pause)
+    d = dict()
+    d[tons[ton]+"0"] = temp
+    return d
+
+
+def generateMelLevel2():
+    tons = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    
+    ton1 = randrange(0, 7)
+    ton2 = randrange(0, 7)
+    t = [ton1, ton2]
+    pause = Pause()
+    pause.dur = 1/2
+
+    d = dict()
+    
+
+    for i in range(2):
+        temp = []
+        for j in range(10):
+            if j % 2 == 0:
+                temp.append(Note("whole", 1, tons[t[i]], 0, False))
+            else:
+                temp.append(pause)
+        d[tons[t[i]] + "0"] = temp
+    return d
+
+
+def generateMelLevel3():
+    tons = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+    d = dict()
+    pause = Pause()
+    pause.dur = 1/2
+    ton = randrange(0, 7)
+    desc = choice([True, False])
+    t = []
+    o = []
+    oct = 0
+    if desc:
+        for i in range(4):
+            t.append(ton - i)
+            o.append(oct)
+            if ton - i == 0:
+                oct = -1
+                ton = 7
+    else:
+        for i in range(4):
+            t.append(ton + i)
+            o.append(oct)
+            if ton + i == 6:
+                oct = 1
+                ton = -1
+        
+    for i in range(4):
+        temp = []
+        for j in range(7):
+            if j == i or j == 7-i-1:
+                temp.append(Note("whole", 1, tons[t[i]], o[i], False))
+            else:
+                temp.append(pause)
+        
+        d[tons[t[i]] + str(o[i])] = temp
+    return d
+
+def generateMelLevel4():
+    pass
+    
+    
+
+def createMusFile(notes, name):
+    """Создает музкальный файл из списка нот"""
+    mid = MidiFile()
+    time = int(second2tick(0.5, 480, 500000))
+    start = 60
+    
+    for i in notes.keys():
+        track = MidiTrack()
+        mid.tracks.append(track)
+        for j in notes[i]:
+            note = j.getNoteNum()
+            t = int(second2tick(1 * j.getDur(), 480, 500000))
+            track.append(Message('program_change', program=1, time=0))
+            track.append(Message('note_on', note=note, velocity=80, time=t))
+            track.append(Message('note_off', note=note, velocity=80, time=time))
+
+        
+    mid.save(f'../temp/{name}.mid')
+    

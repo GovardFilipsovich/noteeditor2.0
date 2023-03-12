@@ -1,0 +1,203 @@
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import QRect, QLine, QSize
+from PyQt5.QtMultimedia import QMediaPlayer
+from PyQt5.Qt import *
+from mido import Message, MidiFile, MidiTrack, second2tick, open_output
+import threading
+import time
+
+class MidiPlayer:
+    """Проигрывает файлы midi"""
+    def __init__(self):
+        self.stat = 0
+        self.pos = 0
+
+        
+    def setMedia(self, file):
+        """Устанавливает нужную композицию"""
+        self.file = file
+        self.melody = MidiFile(file)
+        self.hex = []
+        for i in self.melody:
+            if not i.is_meta:
+                self.hex.append((i.hex(), i.time))
+
+        
+    def play(self):
+        self.stat = 1
+        self.port = open_output()
+        t = threading.Thread(target=self.start)
+        t.start()
+
+        
+    def stop(self):
+        self.stat = 2
+        self.pos = 0
+        
+
+    def start(self):
+        if self.stat == 1:
+            print(self.pos)
+            for i in range(self.pos, len(self.hex), 1):
+                msg = Message.from_hex(self.hex[i][0], time=self.hex[i][1])
+                time.sleep(msg.time)
+                self.port.send(msg)
+                
+                if self.stat == 2:
+                    self.pos = 0
+                    self.port.close()
+                    return
+                elif self.stat == 0:
+                    self.pos = i
+                    self.port.close()
+                    return
+                self.pos = i
+            self.port.close()
+            self.pos = 0
+            self.stat = 0
+
+                
+                
+        
+    def position(self):
+        """Возращает текущую позицию песни"""
+        return self.pos
+        
+
+    def pause(self):
+        self.stat = 0
+                    
+
+    def duration(self):
+        return len(self.hex)
+
+    
+    def state(self):
+        """Возращает состояние текущего файла"""
+        return self.stat  
+
+
+class Slider(QWidget):
+    """Класс полосы"""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.setSizePolicy(
+            QSizePolicy.MinimumExpanding,
+            QSizePolicy.MinimumExpanding
+        )
+        self.per = 0
+
+    def sizeHint(self):
+        return QSize(500,10)
+    
+    def paintEvent(self, e):
+        # Функция отрисовки слайдера
+        painter = QPainter(self)
+        brush = QBrush()
+        brush.setStyle(Qt.SolidPattern)
+
+        y_line = painter.device().height()/2
+        line = QLine(0, y_line, painter.device().width(), y_line)
+        painter.drawLine(line)
+        
+        x = 3 + painter.device().width() * self.per
+        
+        
+
+        #Рисование пройденного пути
+        rect = QRect(0, y_line-2, x, 4)
+        brush.setColor(QColor("blue"))
+        painter.setBrush(brush)
+        painter.drawRect(rect)
+
+        #Рисование указателя
+        center = QPoint(x, painter.device().height()/2)
+        brush.setColor(QColor('red'))
+        painter.setBrush(brush)
+        painter.drawEllipse(center, 3, 3)
+
+    def update(self, per):
+        super().update()
+        self.per = per
+        
+        
+class Player(QWidget):
+    """Простой музыкальный плеер"""
+    def __init__(self, *args, **kwargs):
+        super(Player, self).__init__(*args, **kwargs)
+
+        layout = QHBoxLayout()
+
+        self.mediaPlayer = MidiPlayer()
+
+        self.play = QPushButton()
+        self.play.clicked.connect(self.playBut)
+        self.play.setIcon(QIcon('../des/forw.png'))
+        layout.addWidget(self.play)
+        
+
+        self.slide = Slider()
+        layout.addWidget(self.slide)
+
+        self.setLayout(layout)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.start)
+
+
+    def clear(self):
+        """Очищает, останавливает плэйер"""
+        self.mediaPlayer.stop()
+        self.slide.update(0)
+        
+        
+    def playBut(self):
+        """Функция запуска плеера"""
+        if self.mediaPlayer.state() == 0 or self.mediaPlayer.state() == 2:
+            self.mediaPlayer.play()
+            self.play.setIcon(QIcon("../des/pause.png"))
+        elif self.mediaPlayer.state() == 1:
+            self.mediaPlayer.pause()
+            self.play.setIcon(QIcon('../des/forw.png'))
+        self.start()
+            
+        
+        
+    def start(self):
+        self.timer.start(500)
+        if self.mediaPlayer.duration() != 0:
+            per = self.mediaPlayer.position() / self.mediaPlayer.duration()
+            self.slide.update(per)
+        
+            if self.mediaPlayer.state() == 0 or self.mediaPlayer.state() == 2:
+                self.timer.stop()
+                self.play.setIcon(QIcon('../des/forw.png'))
+        else:
+            return
+            
+
+            
+    def setSong(self, path):
+        """Установка песни"""
+        self.mediaPlayer.setMedia(path)
+
+    def getSong(self):
+        """Получение песни"""
+        return self.mediaPlayer.file
+        
+        
+        
+       
+        
+
+if __name__ == "__main__":        
+    app = QApplication([])
+    volume = Player()
+    volume.setSong("../temp/5.mid")
+    volume.show()
+    app.exec_()
+        
+    

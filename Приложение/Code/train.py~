@@ -1,0 +1,108 @@
+from gen import Gen
+from PyQt5.QtCore import QRect
+
+from player import Player
+from enter import *
+from music import *
+
+
+class Train(Gen):
+    """Окно тренажера"""
+
+    def __init__(self, parent=None):
+        super().__init__("train_widget", parent)
+        self.toMenu.clicked.connect(self.transit_menu)
+        self.train_ear.clicked.connect(self.transit_levels)
+        
+    def transit_levels(self):
+        self.parent.Stack.setCurrentIndex(6)
+        
+    def transit_menu(self):
+        """Переход к меню"""
+        self.parent.Stack.setCurrentIndex(2)
+
+    
+
+
+class TrainLevels(Gen):
+    def __init__(self, parent=None):
+        super().__init__("train_levels_widget", parent)
+        self.toMenu.clicked.connect(self.transit_menu)
+        self.lev1.clicked.connect(self.transit_ear)
+
+    def transit_menu(self):
+        """Переход к меню"""
+        self.parent.Stack.setCurrentIndex(5)
+        
+    def transit_ear(self):
+        """Переход к тренировки слуха"""
+        sender = self.sender()
+        self.parent.music_ear_wid.setLevel(sender.objectName())
+        self.parent.Stack.setCurrentIndex(7)
+    
+        
+
+
+class MusicEar(Gen):
+    """Окно тренировки слуха"""
+    def __init__(self, parent=None):
+        super().__init__("music_ear_widget", parent)
+        self.toMenu.clicked.connect(self.transit_menu)
+        self.level = "lev1"
+
+        self.init_melody()
+               
+        self.player = Player(self)
+        self.player.setGeometry(QRect(150, 170, 600, 150))
+        self.player.setObjectName("player")
+        self.player.setSong(f"../temp/{self.level[-1]}.mid")
+
+
+        self.musicScene = MusicScene(120, 600)
+        
+        self.musicView = MusicView(self)
+        self.musicView.setScene(self.musicScene)
+        self.musicView.setGeometry(QRect(150, 400, 620, 130))
+        
+        self.check.clicked.connect(self.checkClicked)
+
+
+    def setLevel(self, name):
+        self.name = name 
+        
+        
+    def checkClicked(self):
+        """Выполняет проверку введенной мелодии"""
+        print(self.musicScene.getMelody())
+        print(self.melody)
+        if self.musicScene.getMelody() == self.melody:
+            return
+        else:
+            return
+        
+        
+    def transit_menu(self):
+        """Переход к меню"""
+        self.parent.Stack.setCurrentIndex(6)
+
+        
+    def init_melody(self):
+        """Дает мелодию для тренировки"""
+        generate = {"lev1": generateMelLevel1, "lev2": generateMelLevel2,
+                    "lev3": generateMelLevel3, "lev4": generateMelLevel4,
+                    "lev5": generateMelLevel5}
+        self.melody = generate[self.level]()
+
+    
+    def onTransit(self):
+        self.init_melody()
+
+
+if __name__ == "__main__":
+    import sys
+    from PyQt5.QtWidgets import QApplication
+    app = QApplication(sys.argv)
+    window = MusicEar()
+    window.show()
+    sys.exit(app.exec_())
+

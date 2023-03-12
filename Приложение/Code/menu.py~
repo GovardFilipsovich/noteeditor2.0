@@ -1,0 +1,19 @@
+from gen import Gen
+
+
+class Menu(Gen):
+    """Класс меню. Организован для работы с меню"""
+
+    def __init__(self, parent=None):
+        super().__init__("menu_widget", parent)
+        self.theory_but.clicked.connect(self.transit_theory)
+        self.train_but.clicked.connect(self.transit_train)
+
+        
+    def transit_theory(self):
+        """Переход на теорию"""
+        self.parent.Stack.setCurrentIndex(3)
+
+        
+    def transit_train(self):
+        self.parent.Stack.setCurrentIndex(5)

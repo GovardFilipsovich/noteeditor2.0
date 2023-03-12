@@ -1,0 +1,287 @@
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import QRect, QLine, QSize
+from PyQt5.Qt import *
+from music import Note, Pause
+         
+        
+class CellNoteItem(QGraphicsItem):
+    """Ячейка для ноты"""
+    
+    def __init__(self, a, b, note, parent=None):
+        super(CellNoteItem, self).__init__(parent)
+        self.hig = a
+        self.wid = b
+        self.note = note
+
+        
+    def boundingRect(self):
+        """Возращает область вокруг item"""
+        return QRectF(0, 0, self.wid*2 + 10, 4*self.hig)
+        
+
+    def paint(self, painter, option, widget):
+        target = QRectF(0, 0, self.wid*2, self.hig * 4)
+        source = QRectF(0, 0, 300, 234)
+        pix = self.note.picture
+        painter.drawPixmap(target, pix, source)
+        
+
+
+class Key(QGraphicsItem):
+    def __init__(self, w, h, type, row, parent=None):
+        super(Key, self).__init__(parent)
+        self.hig = h
+        self.wid = w
+        self.type = type
+        self.row = row
+        
+
+    def boundingRect(self):
+        """Возращает область вокруг item"""
+        return QRectF(0, 0, self.wid, self.hig)
+
+    
+    def paint(self, painter, option, widget):
+        start = self.hig / 3
+        if self.type == "G":
+            y = start + self.hig / 12 * (5 - self.row)
+            y_center = y-self.hig/5 - 5
+            height = self.hig / 2.5
+        
+        pixmap = QPixmap(f"../img/Key_{self.type}.png")
+        target = QRectF(0, y_center, self.wid, height)
+        source = QRectF(0, 0, 100, 200)
+        painter.drawPixmap(target, pixmap, source)        
+    
+        
+
+class MusicScene(QGraphicsScene):
+    """Класс для ввода музыкальных композиций"""
+    
+    def __init__(self, h, w, parent=None):
+        super(MusicScene, self).__init__(parent)
+
+        #Определение постоянного значение ширины элемента
+        self.wid = 30
+        self.cols = 24
+
+        #Определяем скрипичный ключ по умолчанию
+        #Линии считаются снизу
+        self.key = Key(self.wid, h, "G", 2)
+        self.key.setX(0)
+        self.addItem(self.key)
+        
+        item = QGraphicsRectItem(0,0,self.wid,h)
+        item.setX(self.wid)
+        self.addItem(item)
+
+        item = QGraphicsRectItem(0,0,self.wid,h)
+        item.setX(2 * self.wid)
+        self.addItem(item)
+
+        item = QGraphicsRectItem(0,0,w-self.wid*3,h)
+        item.setX(3 * self.wid)
+        self.addItem(item)
+
+        self.initLines()
+
+        #Список возможных длительностей для нот
+        self.durations = ["whole", "half", "quarter", "quaver", "sixteenth"]
+
+        #Список возможных тонов
+        self.tons = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+        
+
+    def getMelody(self):
+        """Возвращает список нот для сравнения"""
+        notes = {}
+        total = {}
+        for i in self.items():
+            if i.__class__ == CellNoteItem:
+                key = i.note.ton+str(i.note.octave)
+                if key not in notes.keys():
+                    notes[key] = [i]
+                else:
+                    notes[key].append(i)
+
+        for i in notes.keys():
+            s_notes = sorted(notes[i], key=lambda i: i.x())
+            x = self.wid*3
+            for j in s_notes:
+                x = j.x() - x
+                pauses = [Pause() for p in range(int(x/self.wid))]
+                if i not in total.keys():
+                    total[i] = pauses + [j.note]
+                else:
+                    total[i] += pauses + [j.note]
+                x = j.x()
+        return total
+
+    
+    def getYNote(self, ton, oct):
+        """Возращает высоту ноты"""
+        key_y = (9 - self.key.row) * self.height() / 12
+        line = self.height() / 24
+        key_line = key_y / line
+        cur_index = self.tons.index(self.key.type)
+        ind = self.tons.index(ton) + oct * 7
+        delta_ton = ind - cur_index
+        y_line = key_line - delta_ton + line/2
+        y = line * y_line
+        return y
+        
+        
+
+    def setMelody(self, notes):
+        """Устанавливает на сцену данный список нот словарь"""
+        self.clear()
+        for i in notes.keys():
+            ton = i[0]
+            oct = int(i[1:len(i)])
+            y = self.getYNote(ton, oct)
+            x = self.wid * 3.5
+            for j in notes[i]:
+                if j.__class__ == Note:
+                    # Получение высоты и ширины объекта
+                    sizes = self.findCell(x, y)
+                    # Получение ориентации ноты
+                    j.o = 1 if y + sizes[-1] > self.center + sizes[-1]/2 else 2
+                    j.initPict()
+                    item = CellNoteItem(sizes[-2], sizes[-1], j)
+                    item.setX(x)
+                    item.setY(y)
+                    self.addItem(item)
+                elif j.__class__ == Pause:
+                    x += self.wid
+            
+        
+        
+    def initLines(self):
+        h = self.height()
+        """Инициализация линий"""
+        w = self.width()
+        start = h / 3
+
+        self.center = start + h / 12 * 2
+        
+        for i in range(5):
+            y = start + h / 12 * i
+            line = QGraphicsLineItem(0, y, w, y)
+            self.addItem(line)
+
+
+    def setKey(self, type, row):
+        """Устанавливает нужный ключ"""
+        self.removeItem(self.key)
+        self.key = Key(self.wid, self.height(), type, row)
+        self.addItem(self.key)
+        
+        
+    def findCell(self, coord_x, coord_y):
+        """Определяет, в какую ячейку добавить ноту"""
+        h = self.height() / 24
+        w = (self.width() / 40)
+        
+        cols = int(40 * (self.cols-3)/self.cols)
+        start_x = self.height() / 8 * 3
+        start_y = h / 2
+
+        tot_x = 0
+        tot_y = 0
+        for y in range(23):
+            for x in range(cols):
+                tot_x = start_x + x*w
+                tot_y = start_y + y*h
+                if tot_x <= coord_x and coord_x <= tot_x + w and tot_y <= coord_y and coord_y <= tot_y + h:
+                    return (tot_x, tot_y, h, w)
+        
+
+    def getNoteTone(self, y):
+        """Определяет тон ноты в зависимости от ключа"""
+        key_y = (9 - self.key.row) * self.height() / 12
+        line = self.height() / 24
+        key_line = key_y / line
+        y_line = y / line
+        delta_ton = int(key_line - y_line)
+        cur_index = self.tons.index(self.key.type)
+        ind = cur_index + delta_ton
+        ton = ind % 7
+        oct = int(ind/7) if (ind / 7) >= 0 else int(ind/7) - 1
+        return (self.tons[ton] , oct)
+        
+
+        
+    def clear(self):
+        """Очищает ноты"""
+        for i in self.items():
+            if i.__class__ == CellNoteItem:
+                self.removeItem(i)
+        
+        
+    
+    def mousePressEvent(self, e):
+        super(MusicScene, self).mousePressEvent(e)
+        
+        
+        if e.button() == Qt.LeftButton:
+            if (len(self.items(e.scenePos())) > 1) and self.items(e.scenePos())[0].__class__ != QGraphicsLineItem and self.items(e.scenePos())[0].__class__ != QGraphicsRectItem:
+                item = self.items(e.scenePos())[0]
+                note = item.note
+                y = item.y()
+                h = item.hig
+                if note.orient == 1 and note.dur == "whole":
+                    item.setY(y - 3*h)
+                index = self.durations.index(note.dur) + 1
+                if index == len(self.durations): index = 0
+                note.setDur(self.durations[index])
+                item.note = note
+                item.update()
+                return
+
+            try:
+                x, y, h, w = self.findCell(e.scenePos().x(), e.scenePos().y())
+            except Exception:
+                return
+
+            o = 1 if y + h > self.center + h/2 else 2
+
+            
+            ton, octave = self.getNoteTone(y + h/2)
+            note = Note(self.durations[0], o, ton, octave)
+            
+            item = CellNoteItem(h, w, note)
+            item.setX(x)
+            if o == 1 and note.dur != "whole":
+                item.setY(y - 3*h)
+            else:
+                item.setY(y)
+            self.addItem(item)
+        else:
+            if(len(self.items(e.scenePos())) == 1) and self.items(e.scenePos())[0].__class__ != QGraphicsLineItem:
+                return
+            x, y, w, h = self.findCell(e.scenePos().x(), e.scenePos().y())
+            self.removeItem(self.items(e.scenePos())[0])
+
+
+
+class MusicView(QGraphicsView):
+    """Класс для отображения "Сцены" """
+    def mousePressEvent(self, e):
+        """Обновляет сцену"""
+        super(MusicView, self).mousePressEvent(e)
+        self.update()
+
+        
+
+if __name__ == "__main__":        
+    app = QApplication([])
+    
+    scene = MusicScene(100, 600)
+    #scene.setKey("G", 1)
+    
+    view = MusicView(scene)
+
+    view.show()
+    
+    app.exec_()
